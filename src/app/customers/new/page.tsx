@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
-import { customerApi, CreateCustomer } from '../../lib/api';
-import CustomerForm from '../../components/CustomerForm';
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
+import { customerApi, CreateCustomer } from "../../lib/api";
+import CustomerForm from "../../components/CustomerForm";
 
 export default function NewCustomerPage() {
   const router = useRouter();
@@ -15,17 +15,17 @@ export default function NewCustomerPage() {
     setIsLoading(true);
     try {
       const response = await customerApi.create(data);
-      toast.success('Customer created successfully!');
-      router.push(`/customers/${response.data.id}`);
+      toast.success("Customer created successfully!");
+      router.push("/customers");
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to create customer');
+      toast.error(error.response?.data?.message || "Failed to create customer");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleCancel = () => {
-    router.push('/customers');
+    router.push("/customers");
   };
 
   return (
@@ -40,10 +40,12 @@ export default function NewCustomerPage() {
               >
                 <ArrowLeft className="w-6 h-6" />
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">Create New Customer/Lead</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Create New Customer/Lead
+              </h1>
             </div>
           </div>
-          
+
           <CustomerForm
             onSubmit={handleSubmit}
             onCancel={handleCancel}

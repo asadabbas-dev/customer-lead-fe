@@ -1,26 +1,48 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { X, ChevronLeft, ChevronRight, Trash2, Download, ZoomIn } from 'lucide-react';
-import { CustomerImage } from '../lib/api';
-import toast from 'react-hot-toast';
+import React, { useState } from "react";
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Download,
+  ZoomIn,
+  Camera,
+} from "lucide-react";
+import { CustomerImage } from "../lib/api";
+import toast from "react-hot-toast";
+import DeleteModal from "./DeleteModal";
 
 interface ImageGalleryProps {
   images: CustomerImage[];
   onDeleteImage: (imageId: number) => void;
 }
 
-export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProps) {
+export default function ImageGallery({
+  images,
+  onDeleteImage,
+}: ImageGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<{
+    id: number;
+    name?: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (images.length === 0) {
     return (
-      <div className="text-center py-16 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-        <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-          📷
+      <div className="text-center py-12 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+        <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+          <Camera className="w-8 h-8 text-slate-400" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No images uploaded yet</h3>
-        <p className="text-gray-500">Upload some images to see them in the gallery</p>
+        <h3 className="text-lg font-medium text-slate-900 mb-2">
+          No images uploaded yet
+        </h3>
+        <p className="text-slate-500 text-sm">
+          Upload some images to see them in the gallery
+        </p>
       </div>
     );
   }
@@ -41,49 +63,62 @@ export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProp
 
   const prevImage = () => {
     if (selectedIndex !== null) {
-      setSelectedIndex(selectedIndex === 0 ? images.length - 1 : selectedIndex - 1);
+      setSelectedIndex(
+        selectedIndex === 0 ? images.length - 1 : selectedIndex - 1
+      );
     }
   };
 
-  const handleDelete = async (imageId: number, imageName?: string) => {
-    if (confirm(`Are you sure you want to delete ${imageName || 'this image'}?`)) {
-      try {
-        await onDeleteImage(imageId);
-        toast.success('🗑️ Image deleted successfully');
-        
-        if (selectedIndex !== null) {
-          const currentImage = images[selectedIndex];
-          if (currentImage.id === imageId) {
-            closeModal();
-          }
+  const handleDeleteClick = (imageId: number, imageName?: string) => {
+    setImageToDelete({ id: imageId, name: imageName });
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!imageToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await onDeleteImage(imageToDelete.id);
+      toast.success("Image deleted successfully");
+
+      if (selectedIndex !== null) {
+        const currentImage = images[selectedIndex];
+        if (currentImage.id === imageToDelete.id) {
+          closeModal();
         }
-      } catch (error) {
-        toast.error('Failed to delete image');
       }
+
+      setShowDeleteModal(false);
+      setImageToDelete(null);
+    } catch (error) {
+      toast.error("Failed to delete image");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const downloadImage = (imageData: string, fileName?: string) => {
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = imageData;
-    link.download = fileName || 'customer-image.jpg';
+    link.download = fileName || "customer-image.jpg";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('📥 Image downloaded');
+    toast.success("Image downloaded");
   };
 
   return (
     <>
       {/* Grid View */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {images.map((image, index) => (
-          <div 
-            key={image.id} 
-            className="group relative bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          <div
+            key={image.id}
+            className="group relative bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-md transition-all duration-200 transform hover:scale-[1.02]"
           >
-            <div 
-              className="aspect-square bg-gray-100 cursor-pointer relative overflow-hidden"
+            <div
+              className="aspect-square bg-slate-100 cursor-pointer relative overflow-hidden"
               onClick={() => openModal(index)}
             >
               <img
@@ -91,47 +126,47 @@ export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProp
                 alt={image.fileName || `Image ${index + 1}`}
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               />
-              
+
               {/* Hover Overlay */}
               <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                <ZoomIn className="w-8 h-8 text-white" />
+                <ZoomIn className="w-6 h-6 text-white" />
               </div>
             </div>
-            
+
             {/* Action Buttons */}
-            <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   downloadImage(image.imageData, image.fileName);
                 }}
-                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-colors"
+                className="p-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg shadow-sm transition-colors"
                 title="Download"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-3 h-3" />
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDelete(image.id, image.fileName);
+                  handleDeleteClick(image.id, image.fileName);
                 }}
-                className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-colors"
+                className="p-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg shadow-sm transition-colors"
                 title="Delete"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3 h-3" />
               </button>
             </div>
-            
+
             {/* Image Info */}
-            <div className="p-4">
-              <h4 className="text-sm font-medium text-gray-900 truncate">
+            <div className="p-3">
+              <h4 className="text-sm font-medium text-slate-900 truncate">
                 {image.fileName || `Image ${index + 1}`}
               </h4>
-              <p className="text-xs text-gray-500 mt-1">
-                {new Date(image.uploadedAt).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric'
+              <p className="text-xs text-slate-500 mt-1">
+                {new Date(image.uploadedAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
                 })}
               </p>
             </div>
@@ -146,9 +181,9 @@ export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProp
             {/* Close button */}
             <button
               onClick={closeModal}
-              className="absolute top-6 right-6 text-white hover:text-gray-300 z-20 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 transition-all"
+              className="absolute top-6 right-6 text-white hover:text-slate-300 z-20 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 transition-all"
             >
-              <X className="w-8 h-8" />
+              <X className="w-6 h-6" />
             </button>
 
             {/* Navigation buttons */}
@@ -156,15 +191,15 @@ export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProp
               <>
                 <button
                   onClick={prevImage}
-                  className="absolute left-6 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-20 p-3 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 transition-all"
+                  className="absolute left-6 top-1/2 transform -translate-y-1/2 text-white hover:text-slate-300 z-20 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 transition-all"
                 >
-                  <ChevronLeft className="w-8 h-8" />
+                  <ChevronLeft className="w-6 h-6" />
                 </button>
                 <button
                   onClick={nextImage}
-                  className="absolute right-6 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-20 p-3 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 transition-all"
+                  className="absolute right-6 top-1/2 transform -translate-y-1/2 text-white hover:text-slate-300 z-20 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 transition-all"
                 >
-                  <ChevronRight className="w-8 h-8" />
+                  <ChevronRight className="w-6 h-6" />
                 </button>
               </>
             )}
@@ -173,7 +208,9 @@ export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProp
             <div className="relative max-w-full max-h-full flex items-center justify-center">
               <img
                 src={images[selectedIndex].imageData}
-                alt={images[selectedIndex].fileName || `Image ${selectedIndex + 1}`}
+                alt={
+                  images[selectedIndex].fileName || `Image ${selectedIndex + 1}`
+                }
                 className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
               />
             </div>
@@ -183,15 +220,19 @@ export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProp
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold">
-                    {images[selectedIndex].fileName || `Image ${selectedIndex + 1}`}
+                    {images[selectedIndex].fileName ||
+                      `Image ${selectedIndex + 1}`}
                   </h3>
                   <p className="text-sm opacity-75">
-                    {selectedIndex + 1} of {images.length} • {new Date(images[selectedIndex].uploadedAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
+                    {selectedIndex + 1} of {images.length} •{" "}
+                    {new Date(
+                      images[selectedIndex].uploadedAt
+                    ).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
                     })}
                   </p>
                 </div>
@@ -199,15 +240,25 @@ export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProp
                 {/* Action buttons in modal */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => downloadImage(images[selectedIndex].imageData, images[selectedIndex].fileName)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                    onClick={() =>
+                      downloadImage(
+                        images[selectedIndex].imageData,
+                        images[selectedIndex].fileName
+                      )
+                    }
+                    className="flex items-center gap-2 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors text-sm"
                   >
                     <Download className="w-4 h-4" />
                     Download
                   </button>
                   <button
-                    onClick={() => handleDelete(images[selectedIndex].id, images[selectedIndex].fileName)}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                    onClick={() =>
+                      handleDeleteClick(
+                        images[selectedIndex].id,
+                        images[selectedIndex].fileName
+                      )
+                    }
+                    className="flex items-center gap-2 px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition-colors text-sm"
                   >
                     <Trash2 className="w-4 h-4" />
                     Delete
@@ -217,12 +268,28 @@ export default function ImageGallery({ images, onDeleteImage }: ImageGalleryProp
             </div>
 
             {/* Image Counter */}
-            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full text-sm">
+            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
               {selectedIndex + 1} / {images.length}
             </div>
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setImageToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Image"
+        message={`Are you sure you want to delete "${
+          imageToDelete?.name || "this image"
+        }"? This action cannot be undone.`}
+        confirmText="Delete Image"
+        isLoading={isDeleting}
+      />
     </>
   );
 }
