@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   ChevronLeft,
@@ -9,6 +9,7 @@ import {
   Download,
   ZoomIn,
   Camera,
+  Maximize2,
 } from "lucide-react";
 import { CustomerImage } from "../lib/api";
 import toast from "react-hot-toast";
@@ -23,13 +24,21 @@ export default function ImageGallery({
   images,
   onDeleteImage,
 }: ImageGalleryProps) {
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<{
     id: number;
     name?: string;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Reset to first image when images change
+  useEffect(() => {
+    if (images.length > 0 && currentIndex >= images.length) {
+      setCurrentIndex(0);
+    }
+  }, [images.length, currentIndex]);
 
   if (images.length === 0) {
     return (
@@ -41,37 +50,36 @@ export default function ImageGallery({
           No images uploaded yet
         </h3>
         <p className="text-slate-500 text-sm">
-          Upload some images to see them in the gallery
+          Upload some images to see them in the carousel
         </p>
       </div>
     );
   }
 
-  const openModal = (index: number) => {
-    setSelectedIndex(index);
-  };
-
-  const closeModal = () => {
-    setSelectedIndex(null);
-  };
-
   const nextImage = () => {
-    if (selectedIndex !== null) {
-      setSelectedIndex((selectedIndex + 1) % images.length);
-    }
+    setCurrentIndex((prev) => (prev + 1) % images.length);
   };
 
   const prevImage = () => {
-    if (selectedIndex !== null) {
-      setSelectedIndex(
-        selectedIndex === 0 ? images.length - 1 : selectedIndex - 1
-      );
-    }
+    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
   };
 
-  const handleDeleteClick = (imageId: number, imageName?: string) => {
-    setImageToDelete({ id: imageId, name: imageName });
-    setShowDeleteModal(true);
+  const openFullscreen = () => {
+    setIsFullscreen(true);
+  };
+
+  const closeFullscreen = () => {
+    setIsFullscreen(false);
+  };
+
+  const handleDeleteClick = (imageId?: number, imageName?: string) => {
+    const idToDelete = imageId || images[currentIndex]?.id;
+    const nameToDelete = imageName || images[currentIndex]?.fileName;
+
+    if (idToDelete) {
+      setImageToDelete({ id: idToDelete, name: nameToDelete });
+      setShowDeleteModal(true);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -82,11 +90,9 @@ export default function ImageGallery({
       await onDeleteImage(imageToDelete.id);
       toast.success("Image deleted successfully");
 
-      if (selectedIndex !== null) {
-        const currentImage = images[selectedIndex];
-        if (currentImage.id === imageToDelete.id) {
-          closeModal();
-        }
+      // If deleting current image and it was the last one, go to previous
+      if (currentIndex >= images.length - 1 && currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
       }
 
       setShowDeleteModal(false);
@@ -98,89 +104,144 @@ export default function ImageGallery({
     }
   };
 
-  const downloadImage = (imageData: string, fileName?: string) => {
-    const link = document.createElement("a");
-    link.href = imageData;
-    link.download = fileName || "customer-image.jpg";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Image downloaded");
+  const downloadImage = (imageData?: string, fileName?: string) => {
+    const dataToDownload = imageData || images[currentIndex]?.imageData;
+    const nameToDownload = fileName || images[currentIndex]?.fileName;
+
+    if (dataToDownload) {
+      const link = document.createElement("a");
+      link.href = dataToDownload;
+      link.download = nameToDownload || "customer-image.jpg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Image downloaded");
+    }
   };
+
+  const currentImage = images[currentIndex];
 
   return (
     <>
-      {/* Grid View */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {images.map((image, index) => (
-          <div
-            key={image.id}
-            className="group relative bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-md transition-all duration-200 transform hover:scale-[1.02]"
-          >
-            <div
-              className="aspect-square bg-slate-100 cursor-pointer relative overflow-hidden"
-              onClick={() => openModal(index)}
+      {/* Carousel */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        {/* Carousel Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <div className="flex items-center space-x-3">
+            <h3 className="text-base font-semibold text-slate-900">
+              Image Gallery
+            </h3>
+            <span className="text-sm text-slate-500">
+              {currentIndex + 1} of {images.length}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={openFullscreen}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              title="View fullscreen"
             >
-              <img
-                src={image.imageData}
-                alt={image.fileName || `Image ${index + 1}`}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-              />
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => downloadImage()}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              title="Download image"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleDeleteClick()}
+              className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+              title="Delete image"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
-              {/* Hover Overlay */}
-              <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                <ZoomIn className="w-6 h-6 text-white" />
-              </div>
-            </div>
+        {/* Main Carousel Display */}
+        <div className="relative">
+          {/* Main Image */}
+          <div className="aspect-[4/3] bg-slate-100 relative overflow-hidden">
+            <img
+              src={currentImage.imageData}
+              alt={currentImage.fileName || `Image ${currentIndex + 1}`}
+              className="w-full h-full object-contain"
+            />
 
-            {/* Action Buttons */}
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  downloadImage(image.imageData, image.fileName);
-                }}
-                className="p-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg shadow-sm transition-colors"
-                title="Download"
-              >
-                <Download className="w-3 h-3" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteClick(image.id, image.fileName);
-                }}
-                className="p-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg shadow-sm transition-colors"
-                title="Delete"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
+            {/* Navigation Arrows */}
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={prevImage}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full transition-all"
+                  title="Previous image"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={nextImage}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full transition-all"
+                  title="Next image"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
+          </div>
 
-            {/* Image Info */}
-            <div className="p-3">
-              <h4 className="text-sm font-medium text-slate-900 truncate">
-                {image.fileName || `Image ${index + 1}`}
-              </h4>
-              <p className="text-xs text-slate-500 mt-1">
-                {new Date(image.uploadedAt).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </p>
+          {/* Image Info */}
+          <div className="p-4 bg-slate-50 border-t border-slate-200">
+            <h4 className="text-sm font-medium text-slate-900 mb-1">
+              {currentImage.fileName || `Image ${currentIndex + 1}`}
+            </h4>
+            <p className="text-xs text-slate-500">
+              Uploaded on{" "}
+              {new Date(currentImage.uploadedAt).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+        </div>
+
+        {/* Thumbnail Navigation */}
+        {images.length > 1 && (
+          <div className="p-4 border-t border-slate-200">
+            <div className="flex space-x-3 overflow-x-auto pb-2">
+              {images.map((image, index) => (
+                <button
+                  key={image.id}
+                  onClick={() => setCurrentIndex(index)}
+                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                    index === currentIndex
+                      ? "border-indigo-500 ring-2 ring-indigo-200"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <img
+                    src={image.imageData}
+                    alt={image.fileName || `Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
             </div>
           </div>
-        ))}
+        )}
       </div>
 
-      {/* Modal Carousel */}
-      {selectedIndex !== null && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 animate-fade-in">
-          <div className="relative max-w-6xl max-h-full w-full h-full flex items-center justify-center p-4">
+      {/* Fullscreen Modal */}
+      {isFullscreen && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
+          <div className="relative max-w-full max-h-full w-full h-full flex items-center justify-center p-4">
             {/* Close button */}
             <button
-              onClick={closeModal}
+              onClick={closeFullscreen}
               className="absolute top-6 right-6 text-white hover:text-slate-300 z-20 p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-70 transition-all"
             >
               <X className="w-6 h-6" />
@@ -207,10 +268,8 @@ export default function ImageGallery({
             {/* Image */}
             <div className="relative max-w-full max-h-full flex items-center justify-center">
               <img
-                src={images[selectedIndex].imageData}
-                alt={
-                  images[selectedIndex].fileName || `Image ${selectedIndex + 1}`
-                }
+                src={currentImage.imageData}
+                alt={currentImage.fileName || `Image ${currentIndex + 1}`}
                 className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
               />
             </div>
@@ -220,44 +279,34 @@ export default function ImageGallery({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold">
-                    {images[selectedIndex].fileName ||
-                      `Image ${selectedIndex + 1}`}
+                    {currentImage.fileName || `Image ${currentIndex + 1}`}
                   </h3>
                   <p className="text-sm opacity-75">
-                    {selectedIndex + 1} of {images.length} •{" "}
-                    {new Date(
-                      images[selectedIndex].uploadedAt
-                    ).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {currentIndex + 1} of {images.length} •{" "}
+                    {new Date(currentImage.uploadedAt).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }
+                    )}
                   </p>
                 </div>
 
                 {/* Action buttons in modal */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() =>
-                      downloadImage(
-                        images[selectedIndex].imageData,
-                        images[selectedIndex].fileName
-                      )
-                    }
+                    onClick={() => downloadImage()}
                     className="flex items-center gap-2 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors text-sm"
                   >
                     <Download className="w-4 h-4" />
                     Download
                   </button>
                   <button
-                    onClick={() =>
-                      handleDeleteClick(
-                        images[selectedIndex].id,
-                        images[selectedIndex].fileName
-                      )
-                    }
+                    onClick={() => handleDeleteClick()}
                     className="flex items-center gap-2 px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition-colors text-sm"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -269,7 +318,7 @@ export default function ImageGallery({
 
             {/* Image Counter */}
             <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
-              {selectedIndex + 1} / {images.length}
+              {currentIndex + 1} / {images.length}
             </div>
           </div>
         </div>
